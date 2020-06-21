@@ -3,7 +3,7 @@ from interface import Ui_MainWindow
 import sys
 import translator
 
-DICTIONARY = "words"
+DICTIONARY = "rus_dict"
 
 class MyWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -19,7 +19,7 @@ class MyWindow(QtWidgets.QMainWindow):
         if in_text:
             out_text = tr.translate(str(in_text))
             if out_text:
-                self.ui.output.setText("Перевод слова: " + out_text)
+                self.ui.output.setText("Перевод слова: " + str(out_text))
             else:
                 self.ui.output.setText("Перевод не найден.\nПожалуйста, проверьте введённые данные и попробуйте ещё раз.")
 

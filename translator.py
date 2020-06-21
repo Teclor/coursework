@@ -23,7 +23,7 @@ class DB:
         db = self.conn.cursor()
         cmd = "SELECT translation FROM {table} WHERE word LIKE ?"
         cmd = cmd.format(table=self.DICT)
-        db.execute(cmd, (word,))
+        db.execute(cmd, (word.lower(),))
         result = db.fetchall()
         if result:
             return str((result[0][0]))
@@ -40,7 +40,7 @@ class Parser(DB):
         with open('resource/raw/' + self.DICT + '.xdxf', encoding="utf-8") as fin:
             text = fin.read()
         self.create_table()
-        match = re.findall('<ar>.*?</ar>', text, re.DOTALL)  # ленивый квантификатор
+        match = re.findall('<ar>.*?</ar>', text, flags=re.DOTALL)  # ленивый квантификатор
         for m in match:
             m = re.sub("<ar>|</ar>|<k>", "", m)
             m = re.split(r"</k>\n", m)
@@ -52,7 +52,7 @@ class Parser(DB):
 class Translator(DB):
 
     def translate(self, text, en=True):
-        check = re.findall(r"\b(?:\w-?\.?)\b", text, re.DOTALL)
+        check = re.findall(r"\b(?:\w+-?)\b", text, flags=re.DOTALL)
         cnt = len(check)
         if cnt > 1:
             return self.translate_text(text, en)
@@ -63,14 +63,15 @@ class Translator(DB):
         return self.search_translation(word)
 
     def translate_text(self, text, en):
-        match = re.findall(r"\b(?:\w-?)\b", text, re.DOTALL)
+        match = re.findall(r"\b(?:\w+-?)\b", text, flags=re.DOTALL)
         for m in match:
             tr = self.search_translation(m)
-            if en:
-                reg = r"\b(?:[A-Za-z']+-?\.?\s?)+\b"
-            else:
-                reg = r"\b(?:[А-Яа-я']+-?\.?\s?)+\b"
-            tr = re.search(reg, tr)
-            if tr[0]:
-                re.sub(m, tr[0], text)
-            return text
+            if tr:
+                if en:
+                    reg = r"\b(?:[A-Za-z']+-?\.?\s?)+\b"
+                else:
+                    reg = r"\b(?:[А-Яа-я']+-?\.?\s?)+\b"
+                tr = re.search(reg, tr, flags=re.IGNORECASE)
+                if tr[0]:
+                    text = re.sub(m, tr[0].strip(), text)
+        return text
