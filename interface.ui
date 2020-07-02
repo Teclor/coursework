@@ -568,13 +568,13 @@
     <addaction name="about"/>
     <addaction name="creator"/>
    </widget>
-   <widget class="QMenu" name="menu">
+   <widget class="QMenu" name="settings">
     <property name="title">
      <string>Настройки</string>
     </property>
-    <addaction name="action"/>
+    <addaction name="dictionaries"/>
    </widget>
-   <addaction name="menu"/>
+   <addaction name="settings"/>
    <addaction name="Help"/>
   </widget>
   <action name="about">
@@ -597,7 +597,7 @@
     <string>Мини</string>
    </property>
   </action>
-  <action name="action">
+  <action name="dictionaries">
    <property name="text">
     <string>Словари</string>
    </property>

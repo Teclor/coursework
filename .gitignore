@@ -135,4 +135,7 @@ test*
 *.ini
 *.pdf
 *.db
+
+interface.ui
+convert.bat
 resource/raw
