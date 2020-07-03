@@ -70,7 +70,7 @@ class MyWindow(QtWidgets.QMainWindow):
     def translate(self):
         settings = translator.Settings()
         en = True if (self.ui.langTo.currentIndex() == 1) else False
-        tr = translator.Translator(translator.Settings.get_option())
+        tr = translator.Translator(settings.get_option("dictionary"))
         in_text = self.ui.input.toPlainText()
         if in_text:
             out_text = tr.translate(str(in_text), en)
@@ -97,16 +97,23 @@ class MyWindow(QtWidgets.QMainWindow):
                 data = f.read()
                 #textEdit.setText(DICTIONARY)
 
-    def show_error(self, err):
-        error_dialog = QtWidgets.QErrorMessage()
-        error_dialog.showMessage("Ошибка: " + str(err))
-
     def show_dictionaries_menu(self):
         dialog = PreDialog(self.ui.centralWidget)
         dialog.show()
 
+
+    def app_excepthook(self, type, value, tback):
+        QtWidgets.QMessageBox.critical(
+            self, "Ошибка", str(value),
+            QtWidgets.QMessageBox.Ok
+        )
+
+        sys.__excepthook__(type, value, tback)
+
+
 app = QtWidgets.QApplication([])
 application = MyWindow()
+sys.excepthook = application.app_excepthook
 application.show()
 sys.exit(app.exec())
 
