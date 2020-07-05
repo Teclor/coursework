@@ -567,12 +567,14 @@
     </property>
     <addaction name="about"/>
     <addaction name="creator"/>
+    <addaction name="help_quit"/>
    </widget>
    <widget class="QMenu" name="settings">
     <property name="title">
      <string>Настройки</string>
     </property>
     <addaction name="dictionaries"/>
+    <addaction name="load"/>
    </widget>
    <addaction name="settings"/>
    <addaction name="Help"/>
@@ -599,7 +601,17 @@
   </action>
   <action name="dictionaries">
    <property name="text">
-    <string>Словари</string>
+    <string>Выбрать словарь</string>
+   </property>
+  </action>
+  <action name="load">
+   <property name="text">
+    <string>Загрузить словарь</string>
+   </property>
+  </action>
+  <action name="help_quit">
+   <property name="text">
+    <string>Выйти из программы</string>
    </property>
   </action>
  </widget>

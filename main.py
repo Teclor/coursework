@@ -1,62 +1,50 @@
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import QFileInfo, QThread
-from PyQt5.QtWidgets import QFileDialog, QDialog, QComboBox
+from PyQt5.QtCore import QFileInfo, QThread, QSize
+from PyQt5.QtWidgets import QFileDialog, QDialog, QComboBox, QGridLayout
 
 from interface import Ui_MainWindow
 import sys
 import translator
 
 
-class TryThread(QThread):
-
-  def new_run(self):
-    print("Abstract class")
-
-  def run(self):
-    try:
-      self.new_run()
-    except:
-      print ("Ups")
-
-class PreDialog(QDialog):
+class DictDialog(QDialog):
     def __init__(self, parent=None):                      # + parent
-        super(PreDialog, self).__init__(parent)
-        combo = QComboBox(self)
-        combo.addItem("Apple")
-        combo.addItem("Pineapple")
-        self.setWindowTitle('Host Parameters')
+        super(DictDialog, self).__init__(parent)
         self.setModal(True)
-        self.line_host = QtWidgets.QLineEdit()
-        self.line_user = QtWidgets.QLineEdit()
-        self.line_pass = QtWidgets.QLineEdit()
-        self.line_pass.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        self.setWindowTitle('Выбор словаря')
+        layout = QGridLayout()
+        ru_en_dict_combo = QComboBox(self)
+        en_ru_dict_combo = QComboBox(self)
+        db = translator.DB()
+        db_tables = db.get_tables()
+        for table in db_tables:
+            table = str(table)
+            lang = table.split("_")[0]
+            if lang == "rus":
+                ru_en_dict_combo.addItem(table)
+            elif lang == "en":
+                en_ru_dict_combo.addItem(table)
         self.save = QtWidgets.QPushButton("Сохранить")
-        self.spinBox_port = QtWidgets.QSpinBox()
-        self.spinBox_port.setProperty("value", 22)
-        self.hbox = QtWidgets.QHBoxLayout()
-        self.ssh_radio = QtWidgets.QRadioButton("SSH")
-        self.telnet_radio = QtWidgets.QRadioButton("Telnet")
-
-        self.hbox.addWidget(self.ssh_radio)
-        self.hbox.addWidget(self.telnet_radio)
-
-        self.form = QtWidgets.QFormLayout()
-        self.form.setSpacing(20)
-
-        self.form.addRow("&Язык:", combo)
-        self.form.addRow("&Host:",self.line_host)
-        self.form.addRow("&User:",self.line_user)
-        self.form.addRow("&Password:",self.line_pass)
-        self.form.addRow("&Port:",self.spinBox_port)
-        self.form.addRow("Session:",self.hbox)
-        self.form.addRow(self.save)
-
-        self.setLayout(self.form)
+        self.decline = QtWidgets.QPushButton("Отмена")
+        ru_label = QtWidgets.QLabel(self)
+        ru_label.setText("Выберите словарь для русско-английского перевода:")
+        ru_label.setWordWrap(True)
+        en_label = QtWidgets.QLabel(self)
+        en_label.setText("Выберите словарь для англо-русского перевода:")
+        en_label.setWordWrap(True)
+        elements = [ru_label, ru_en_dict_combo,
+                    en_label, en_ru_dict_combo,
+                    self.save, self.decline]
+        positions = [(i, j) for i in range(3) for j in range(2)]
+        for position, element in zip(positions, elements):
+            layout.addWidget(element, *position)
+        self.setLayout(layout)
+        self.resize(QSize(300, 150))
 
 
-class MyWindow(QtWidgets.QMainWindow):
+class TrMainWindow(QtWidgets.QMainWindow):
     def __init__(self):
-        super(MyWindow, self).__init__()
+        super(TrMainWindow, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
         self.ui.translateBtn.clicked.connect(self.translate)
@@ -66,14 +54,14 @@ class MyWindow(QtWidgets.QMainWindow):
         self.ui.langFrom.currentIndexChanged.connect(self.change_lang)
         self.ui.langTo.currentIndexChanged.connect(self.change_lang)
         self.ui.dictionaries.triggered.connect(self.show_dictionaries_menu)
+        self.ui.load.triggered.connect(self.show_open_file_dialog)
 
     def translate(self):
         settings = translator.Settings()
-        en = True if (self.ui.langTo.currentIndex() == 1) else False
         tr = translator.Translator(settings.get_option("dictionary"))
         in_text = self.ui.input.toPlainText()
         if in_text:
-            out_text = tr.translate(str(in_text), en)
+            out_text = tr.translate(str(in_text))
             if out_text:
                 self.ui.output.setPlainText(str(out_text))
             else:
@@ -89,16 +77,19 @@ class MyWindow(QtWidgets.QMainWindow):
             from_combo.setCurrentIndex(index)
 
     def show_open_file_dialog(self):
-        fname = QFileDialog.getOpenFileName(self, 'Откройте файл со словарем', '/', "Файлы XML-словаря (*.xdxf);;Текстовые файлы (*.txt)")[0]
-        if fname:
-            filename = QFileInfo(fname).baseName()
-            f = open(fname, 'r')
+        file = QFileDialog.getOpenFileName(self, 'Откройте файл со словарем', '/', "Файлы XML-словаря (*.xdxf);;Текстовые файлы (*.txt)")[0]
+        if file:
+            file_name = QFileInfo(file).baseName()
+            file_ext = QFileInfo(file).suffix()
+            if file_ext == "xdxf":
+                parser = translator.Parser()
+            f = open(file, 'r')
             with f:
                 data = f.read()
                 #textEdit.setText(DICTIONARY)
 
     def show_dictionaries_menu(self):
-        dialog = PreDialog(self.ui.centralWidget)
+        dialog = DictDialog(self)
         dialog.show()
 
 
@@ -112,7 +103,7 @@ class MyWindow(QtWidgets.QMainWindow):
 
 
 app = QtWidgets.QApplication([])
-application = MyWindow()
+application = TrMainWindow()
 sys.excepthook = application.app_excepthook
 application.show()
 sys.exit(app.exec())

@@ -5,16 +5,25 @@ from PyQt5.QtCore import QCoreApplication, QSettings
 
 
 class DB:
+    def __new__(cls):
+        """
+        Checks the existence of class instance
+        :return: instance of DB
+        """
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(DB, cls).__new__(cls)
+        return cls.instance
 
-    def __init__(self, current_dictionary, db_name="dictionary"):
+    def __init__(self, db_name="dictionary"):
         db_path = "resource\\db\\" + db_name + ".db"
         self.conn = sql.connect(db_path)
-        self.DICT = current_dictionary
+        settings = Settings()
+        self.DICT = settings.get_option("dictionary")
         self.db = self.conn.cursor()
 
     def create_table(self):
         self.db = self.conn.cursor()
-        self.db.execute("CREATE TABLE IF NOT EXISTS" + self.DICT + " (word text NOT NULL, translation text NOT NULL)")
+        self.db.execute("CREATE TABLE IF NOT EXISTS" + self.DICT + " (ID INT NOT NULL AUTO_INCREMENT, word text NOT NULL, translation text NOT NULL)")
 
     def insert_translation(self, word, translation):
         cmd = "INSERT INTO {t} (word, translation) VALUES (?,?)"
@@ -32,7 +41,7 @@ class DB:
             return False
 
     def get_tables(self):
-        self.db.execute("SELECT * FROM sqlite_master WHERE type = 'table'")
+        self.db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         return self.db.fetchall()[0]
 
     def delete_table(self, table_name):
@@ -72,28 +81,47 @@ class Parser(DB):
         self.conn.commit()
 
 
+"""
+Class containing translation methods
+"""
+
+
 class Translator(DB):
 
-    def translate(self, text, en=True):
+    def get_lang(self):
+        return self.DICT.split("_")[0]
+
+    def translate(self, text):
+        """
+        A method to choose which type of translation we need: full translation of a word or translation of a text
+        :param text: string input text
+        :return: string translation
+        """
         check = re.findall(r"\b(?:\w+-?)\b", text, flags=re.DOTALL)
         cnt = len(check)
         if cnt > 1:
-            return self.translate_text(text, en)
+            return self.translate_text(text)
         elif cnt == 1:
-            return self.translate_word(text)
+            return self.search_translation(text)
 
-    def translate_word(self, word):
-        return self.search_translation(word)
-
-    def translate_text(self, text, en):
+    def translate_text(self, text):
+        """
+        Replace each word with it's short translation (first other language word in full translation)
+        :param text: string text to translate
+        :return: string text containing translations
+        """
+        en = self.get_lang()
         match = re.findall(r"\b(?:\w+-?)\b", text, flags=re.DOTALL)
         for m in match:
             tr = self.search_translation(m)
             if tr:
-                if en:
+                if en == "en":
                     reg = r"\b(?:[A-Za-z']+-?\.?\s?)+\b"
-                else:
+                elif en == "ru":
                     reg = r"\b(?:[А-Яа-я']+-?\.?\s?)+\b"
+                else:
+                    raise Exception("Поддержка языка текущего словаря ещё не реализована.")
+
                 tr = re.search(reg, tr, flags=re.IGNORECASE)
                 if tr[0]:
                     text = re.sub(m, tr[0].strip(), text)
