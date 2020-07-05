@@ -1,3 +1,6 @@
+"""
+Module containing necessary classes for working with sql database, settings and texts
+"""
 import sqlite3 as sql
 import re
 
@@ -5,20 +8,13 @@ from PyQt5.QtCore import QCoreApplication, QSettings
 
 
 class DB:
-    def __new__(cls):
-        """
-        Checks the existence of class instance
-        :return: instance of DB
-        """
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(DB, cls).__new__(cls)
-        return cls.instance
 
-    def __init__(self, db_name="dictionary"):
+    def __init__(self):
+        settings = Settings()
+        db_name = settings.get_option("db_name")
         db_path = "resource\\db\\" + db_name + ".db"
         self.conn = sql.connect(db_path)
-        settings = Settings()
-        self.DICT = settings.get_option("dictionary")
+        self.DICT = settings.get_option("dictionary/" + settings.get_option("language/from"))
         self.db = self.conn.cursor()
 
     def create_table(self):
@@ -44,11 +40,15 @@ class DB:
         self.db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
         return self.db.fetchall()[0]
 
+    def get_lang(self):
+        return self.DICT.split("_")[0]
+
     def delete_table(self, table_name):
-        if table_name is not 'rus_eng' or 'eng_rus':
-            cmd = "DROP TABLE IF EXISTS {table}"
-            cmd = cmd.format(table=table_name)
-            self.db.execute(cmd)
+        if table_name is 'ru_eng' or 'en_rus':
+            raise Exception("Словари по умолчанию удалить нельзя!")
+        cmd = "DROP TABLE IF EXISTS {table}"
+        cmd = cmd.format(table=table_name)
+        self.db.execute(cmd)
 
     def __del__(self):
         self.conn.close()
@@ -56,11 +56,11 @@ class DB:
 
 class Parser(DB):
 
-    def parse_xdxf(self):
-        with open('resource/raw/' + self.DICT + '.xdxf', encoding="utf-8") as fin:
+    def parse_xdxf(self, path, progress_bar=None):
+        with open(path, encoding="utf-8") as fin:
             text = fin.read()
         self.create_table()
-        match = re.findall('<ar>.*?</ar>', text, flags=re.DOTALL)  # ленивый квантификатор
+        match = re.findall('<ar>.*?</ar>', text, flags=re.DOTALL)  # ленивый квантификатор ищем самое короткое совпадение
         for m in match:
             m = re.sub("<ar>|</ar>|<k>", "", m)
             m = re.split(r"</k>\n", m)
@@ -68,17 +68,31 @@ class Parser(DB):
                 self.insert_translation(m[0], m[1])
         self.conn.commit()
 
-    def parse_txt(self):
-        with open('resource/raw/' + self.DICT + '.txt', encoding="utf-8") as fin:
-            text = fin.read()
+    def parse_txt(self, path, progress_bar=None):
+        raise Exception("lulw")
+        prog = 0
+        with open(path) as fin:
+            count = sum(1 for line in fin)
+            step = 100 /count
+            while prog < 100:
+                lineA = fin.readline().rstrip()
+                lineB = fin.readline().rstrip()
+                prog +=step
+                progress_bar.setValue(prog)
+
+
+
+        """
         self.create_table()
-        match = re.findall('<ar>.*?</ar>', text, flags=re.DOTALL)  # ленивый квантификатор
+        match = re.findall('<ar>.*?</ar>', text, flags=re.DOTALL)  # ленивый квантификатор, ищем самое короткое совпадение
+        prog = 0
+        step = 100/len(match)
         for m in match:
-            m = re.sub("<ar>|</ar>|<k>", "", m)
-            m = re.split(r"</k>\n", m)
-            if m[0] and m[1]:
-                self.insert_translation(m[0], m[1])
+            if prog < 100:
+                prog += step
+            progress_bar.setValue(prog)
         self.conn.commit()
+        """
 
 
 """
@@ -88,14 +102,11 @@ Class containing translation methods
 
 class Translator(DB):
 
-    def get_lang(self):
-        return self.DICT.split("_")[0]
-
     def translate(self, text):
         """
         A method to choose which type of translation we need: full translation of a word or translation of a text
-        :param text: string input text
-        :return: string translation
+        :param string text: input text
+        :return string: translation
         """
         check = re.findall(r"\b(?:\w+-?)\b", text, flags=re.DOTALL)
         cnt = len(check)
@@ -107,8 +118,8 @@ class Translator(DB):
     def translate_text(self, text):
         """
         Replace each word with it's short translation (first other language word in full translation)
-        :param text: string text to translate
-        :return: string text containing translations
+        :param string text: text to translate
+        :return string: text containing translations
         """
         en = self.get_lang()
         match = re.findall(r"\b(?:\w+-?)\b", text, flags=re.DOTALL)
@@ -165,15 +176,17 @@ class Settings:
         QCoreApplication.setOrganizationName(self.organization)
         QCoreApplication.setApplicationName(self.application)
         settings = QSettings(QCoreApplication.organizationName(), QCoreApplication.applicationName())
-        settings.setValue('dictionary', 'rus_eng')
+        settings.setValue('db_name', 'dictionary')
+        settings.setValue('dictionary/ru', 'ru_eng')
+        settings.setValue('dictionary/en', 'en_rus')
         settings.setValue('language/from', 'ru')
         settings.setValue('language/to', 'en')
 
     def set_option(self, option, value, default=False):
         """
-        :param option: string name of the option to set
-        :param value: string value of the option
-        :param default: bool true if you want to discard all options
+        :param string option: name of the option to set
+        :param string value: value of the option
+        :param bool default: true if you want to discard all options
         """
         if not default:
             self.settings.setValue(option, value)
