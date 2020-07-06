@@ -1,5 +1,5 @@
 from PyQt5 import QtWidgets
-from PyQt5.QtCore import QFileInfo, QSize
+from PyQt5.QtCore import QFileInfo, QSize, QCoreApplication
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QFileDialog, QDialog, QComboBox, QGridLayout, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar, QMessageBox
 
@@ -152,6 +152,8 @@ class TrMainWindow(QtWidgets.QMainWindow):
         self.ui.langTo.currentIndexChanged.connect(self.change_lang)
         self.ui.dictionaries.triggered.connect(self.show_dictionaries_menu)
         self.ui.help_quit.triggered.connect(self.close)
+        self.ui.about.triggered.connect(self.show_about_app)
+        self.ui.creator.triggered.connect(self.show_about_developer)
         self.settings = translator.Settings()
         self.ui.langFrom.setCurrentIndex(0 if self.settings.get_option("language/from") == "en" else 1)
 
@@ -197,6 +199,20 @@ class TrMainWindow(QtWidgets.QMainWindow):
         dialog = DictDialog(self)
         dialog.show()
 
+    def show_about_app(self):
+        text = "Версия: " + QCoreApplication.applicationVersion() + \
+           "\nНазвание: " + QCoreApplication.applicationName() + \
+            "\nПомощь: \nПеревод: приложение может перевести как отдельные слова, так и комбинации различных слов (в основном в изначальной форме, т.е. инфинитивы, имен. падеж и т.д." + \
+            "\nДобавление словаря: чтобы загрузить словарь нужно сначала выбрать его тип, затем нажать \"добавить словарь\". Поддерживаются только xdxf словари и только приведённые к нужному виду txt." + \
+            "\nTXT словарь должен содержать на первой своей строке слово на языке с которого идет перевод, на второй сам перевод и сохранять данную последовательность до конца файла." + \
+            "\nПеред добавлением нового словаря с существующим названием настоятельно рекомендуется удалить старый." + \
+            "\nУдаление словаря: чтобы удалить словарь, достаточно выбрать его из списка и нажать кнопку удалить." + \
+            "\nВыбор словарей: для того чтобы сохранить выбор словарей достаточно выбрать их из списка и нажать кнопку \"Сохранить\""
+        QMessageBox.question(self, 'О приложении', text, QMessageBox.Ok)
+
+    def show_about_developer(self):
+        QMessageBox.question(self, 'О разработчике', 'Приложение разработал: \nСтудент института ИМИТ ВолГУ Бондаренко А.А.', QMessageBox.Ok)
+
     def app_excepthook(self, type, value, tback):
         """
         Allows to show exceptions in app
@@ -209,7 +225,6 @@ class TrMainWindow(QtWidgets.QMainWindow):
             self, "Ошибка", str(value),
             QtWidgets.QMessageBox.Ok
         )
-
         sys.__excepthook__(type, value, tback)
 
 
