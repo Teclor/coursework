@@ -10,43 +10,76 @@ from PyQt5.QtCore import QCoreApplication, QSettings
 class DB:
 
     def __init__(self):
-        settings = Settings()
-        db_name = settings.get_option("db_name")
+        """
+        Class for working with sqlite database
+        """
+        self.settings = Settings()
+        db_name = self.settings.get_option("db_name")
         db_path = "resource\\db\\" + db_name + ".db"
         self.conn = sql.connect(db_path)
-        self.DICT = settings.get_option("dictionary/" + settings.get_option("language/from"))
         self.db = self.conn.cursor()
 
-    def create_table(self):
+    def create_table(self, table_name=None):
+        """
+        Creates a table in DB
+        :param string table_name:
+        :return null:
+        """
+        if table_name is None:
+            table_name = self.settings.get_dictionary()
         self.db = self.conn.cursor()
-        self.db.execute("CREATE TABLE IF NOT EXISTS" + self.DICT + " (ID INT NOT NULL AUTO_INCREMENT, word text NOT NULL, translation text NOT NULL)")
+        self.db.execute("CREATE TABLE IF NOT EXISTS " + table_name + " (word text NOT NULL, translation text NOT NULL);")
 
-    def insert_translation(self, word, translation):
+    def insert_translation(self, word, translation, table_name=None):
+        """
+        Adds a translation into db table
+        :param string word:
+        :param string translation:
+        :param string table_name:
+        :return:
+        """
         cmd = "INSERT INTO {t} (word, translation) VALUES (?,?)"
-        cmd = cmd.format(t=self.DICT)
+        cmd = cmd.format(t= self.settings.get_dictionary() if table_name is None else table_name)
         self.db.execute(cmd, (word, translation))
 
     def search_translation(self, word):
-        cmd = "SELECT translation FROM {table} WHERE word LIKE ?"
-        cmd = cmd.format(table=self.DICT)
+        """
+        Finds all occurrences of a given word
+        :param string word:
+        :return array:
+        """
+        cmd = "SELECT translation FROM {table} WHERE word LIKE ?;"
+        cmd = cmd.format(table=self.settings.get_dictionary())
         self.db.execute(cmd, (word.lower(),))
         result = self.db.fetchall()
         if result:
-            return str((result[0][0]))
+            return result
         else:
             return False
 
     def get_tables(self):
-        self.db.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
-        return self.db.fetchall()[0]
-
-    def get_lang(self):
-        return self.DICT.split("_")[0]
+        """
+        Gets all dictionaries (tables in DB)
+        :return array | bool False:
+        """
+        self.db.execute("SELECT name FROM sqlite_master WHERE type = 'table';")
+        tables = self.db.fetchall()
+        if tables:
+            return tables
+        else:
+            return False
 
     def delete_table(self, table_name):
-        if table_name is 'ru_eng' or 'en_rus':
+        """
+        Deletes a dictionary (table in DB)
+        :param  string table_name:
+        :return null:
+        """
+        if table_name == "Не выбран":
+            raise Exception("Вы не выбрали словарь!")
+        if (table_name == 'ru_eng') or (table_name == 'en_rus'):
             raise Exception("Словари по умолчанию удалить нельзя!")
-        cmd = "DROP TABLE IF EXISTS {table}"
+        cmd = "DROP TABLE IF EXISTS {table};"
         cmd = cmd.format(table=table_name)
         self.db.execute(cmd)
 
@@ -56,52 +89,77 @@ class DB:
 
 class Parser(DB):
 
-    def parse_xdxf(self, path, progress_bar=None):
+    def parse_xdxf(self, path, lang, name, progress_bar=None):
+        """
+        Making a dictionary from XDXF dictionary type file
+        :param string path: file path
+        :param string lang: lang id
+        :param string name: file name without extension
+        :param object progress_bar: progress bar
+        :return null:
+        """
+        table_name = lang + "_" + name
+        if progress_bar:
+            prog = 0
         with open(path, encoding="utf-8") as fin:
             text = fin.read()
-        self.create_table()
+        self.create_table(table_name)
         match = re.findall('<ar>.*?</ar>', text, flags=re.DOTALL)  # ленивый квантификатор ищем самое короткое совпадение
+        step = 100 / len(match)
+
         for m in match:
             m = re.sub("<ar>|</ar>|<k>", "", m)
+            if lang == "en":
+                m = re.sub("<tr>", "[", m)
+                m = re.sub("</tr>", "]", m)
+            m = re.sub("&quot;", "\"", m)
             m = re.split(r"</k>\n", m)
             if m[0] and m[1]:
-                self.insert_translation(m[0], m[1])
+                self.insert_translation(m[0], m[1], table_name)
+            if prog is not None:
+                prog += step
+                progress_bar.setValue(prog)
+        if prog is not None:
+            progress_bar.setValue(100)
+
         self.conn.commit()
 
-    def parse_txt(self, path, progress_bar=None):
-        raise Exception("lulw")
-        prog = 0
-        with open(path) as fin:
+    def parse_txt(self, path, lang, name, progress_bar=None):
+        """
+        Making a dictionary from txt file
+        :param string path: file path
+        :param string lang: lang id
+        :param string name: file name without extension
+        :param object progress_bar: progress bar
+        :return null:
+        """
+        table_name = lang + "_" + name
+        if progress_bar:
+            prog = 0
+        with open(path, encoding="utf-8") as fin:
             count = sum(1 for line in fin)
             step = 100 /count
-            while prog < 100:
+            fin.seek(0)
+            i = 0
+            self.create_table(table_name)
+            while i < count/2:
                 lineA = fin.readline().rstrip()
                 lineB = fin.readline().rstrip()
-                prog +=step
-                progress_bar.setValue(prog)
-
-
-
-        """
-        self.create_table()
-        match = re.findall('<ar>.*?</ar>', text, flags=re.DOTALL)  # ленивый квантификатор, ищем самое короткое совпадение
-        prog = 0
-        step = 100/len(match)
-        for m in match:
-            if prog < 100:
-                prog += step
-            progress_bar.setValue(prog)
-        self.conn.commit()
-        """
-
-
-"""
-Class containing translation methods
-"""
+                lineB = re.sub(r"\t", "; ", lineB)
+                self.insert_translation(lineA, lineB, table_name)
+                if prog is not None:
+                    prog += step
+                    progress_bar.setValue(prog)
+                i += 1
+            self.conn.commit()
+        if prog is not None:
+            progress_bar.setValue(100)
 
 
 class Translator(DB):
-
+    """
+    Class containing translation methods
+    """
     def translate(self, text):
         """
         A method to choose which type of translation we need: full translation of a word or translation of a text
@@ -113,7 +171,21 @@ class Translator(DB):
         if cnt > 1:
             return self.translate_text(text)
         elif cnt == 1:
-            return self.search_translation(text)
+            return self.translate_word(text)
+
+    def translate_word(self, word):
+        """
+        :param string word: a word to translate
+        :return string | bool: translation or False
+        """
+        translations = self.search_translation(word)
+        result = ""
+        if translations is not False:
+            for tr in translations:
+                result = result + tr[0] + "\n"
+            return result
+        else:
+            return False
 
     def translate_text(self, text):
         """
@@ -121,14 +193,14 @@ class Translator(DB):
         :param string text: text to translate
         :return string: text containing translations
         """
-        en = self.get_lang()
+        lang = self.settings.get_lang()
         match = re.findall(r"\b(?:\w+-?)\b", text, flags=re.DOTALL)
         for m in match:
-            tr = self.search_translation(m)
+            tr = str(self.search_translation(m)[0][0])
             if tr:
-                if en == "en":
+                if lang == "ru":
                     reg = r"\b(?:[A-Za-z']+-?\.?\s?)+\b"
-                elif en == "ru":
+                elif lang == "en":
                     reg = r"\b(?:[А-Яа-я']+-?\.?\s?)+\b"
                 else:
                     raise Exception("Поддержка языка текущего словаря ещё не реализована.")
@@ -137,13 +209,6 @@ class Translator(DB):
                 if tr[0]:
                     text = re.sub(m, tr[0].strip(), text)
         return text
-
-
-"""
-Class that is a wrapper on QSettings
-Used for more simple settings manipulating
-Singleton
-"""
 
 
 class Settings:
@@ -159,40 +224,58 @@ class Settings:
 
     def __init__(self):
         """
-        Some default app parameters
+        Class that is a wrapper on QSettings
+        Used for more simple settings manipulating
+        Singleton
         """
         self.version = "1.0.0"
         self.organization = "AB"
         self.application = "STranslate"
+        QCoreApplication.setApplicationVersion(self.version)
+        QCoreApplication.setOrganizationName(self.organization)
+        QCoreApplication.setApplicationName(self.application)
+        self.settings = QSettings("config.ini", QSettings.IniFormat)
         if not QCoreApplication.organizationName() or not QCoreApplication.applicationName():
             self.set_default_options()
-        self.settings = QSettings(QCoreApplication.organizationName(), QCoreApplication.applicationName())
 
     def set_default_options(self):
         """
         Sets default settings
         """
-        QCoreApplication.setApplicationVersion(self.version)
-        QCoreApplication.setOrganizationName(self.organization)
-        QCoreApplication.setApplicationName(self.application)
-        settings = QSettings(QCoreApplication.organizationName(), QCoreApplication.applicationName())
-        settings.setValue('db_name', 'dictionary')
-        settings.setValue('dictionary/ru', 'ru_eng')
-        settings.setValue('dictionary/en', 'en_rus')
-        settings.setValue('language/from', 'ru')
-        settings.setValue('language/to', 'en')
+        self.settings.setValue('db_name', 'dictionary')
+        self.settings.setValue('dictionary/ru', 'ru_eng')
+        self.settings.setValue('dictionary/en', 'en_rus')
+        self.settings.setValue('language/from', 'ru')
+        self.settings.setValue('language/to', 'en')
+        self.settings.sync()
 
-    def set_option(self, option, value, default=False):
+    def set_option(self, option, value):
         """
+        Sets a particular setting
         :param string option: name of the option to set
         :param string value: value of the option
-        :param bool default: true if you want to discard all options
         """
-        if not default:
-            self.settings.setValue(option, value)
-        else:
-            self.set_default_options()
+        self.settings.setValue(option, value)
+        self.settings.sync()
 
     def get_option(self, option):
+        """
+        Gets a particular setting
+        :param string option: a setting we want to get
+        :return string: value of setting
+        """
         return self.settings.value(option)
 
+    def get_dictionary(self):
+        """
+        Gets current dictionary
+        :return string:
+        """
+        return self.get_option("dictionary/" + self.get_option("language/from"))
+
+    def get_lang(self):
+        """
+        Gets current lang id (ru or en)
+        :return string: lang id
+        """
+        return self.get_option("language/from")

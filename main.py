@@ -1,8 +1,7 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QFileInfo, QSize
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QFileDialog, QDialog, QComboBox, QGridLayout, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, \
-    QProgressBar
+from PyQt5.QtWidgets import QFileDialog, QDialog, QComboBox, QGridLayout, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar, QMessageBox
 
 from interface import Ui_MainWindow
 import sys
@@ -11,10 +10,15 @@ import translator
 
 class DictDialog(QDialog):
     def __init__(self, parent=None):
+        """
+        Modal window with settings
+        :param object parent:
+        """
         super(DictDialog, self).__init__(parent)
         self.setModal(True)
         self.setWindowTitle('Выбор словаря')
-
+        self.db = translator.DB()
+        self.settings = translator.Settings()
         self.main_layout = QVBoxLayout()
         self.choose_layout = QGridLayout()
         self.load_layout = QHBoxLayout()
@@ -44,17 +48,7 @@ class DictDialog(QDialog):
         self.delete_label.setAlignment(Qt.AlignCenter)
         self.delete_label.setWordWrap(True)
         self.delete_layout.addWidget(self.delete_btn)
-        db = translator.DB()
-        db_tables = db.get_tables()
-
-        for table in db_tables:
-            table = str(table)
-            lang = table.split("_")[0]
-            if lang == "rus":
-                self.ru_en_dict_combo.addItem(table)
-            elif lang == "en":
-                self.en_ru_dict_combo.addItem(table)
-            self.delete_combo.addItem(table)
+        self.set_dictionaries_lists()
 
         self.ru_label.setText("Выберите словарь для русско-английского перевода:")
         self.ru_label.setWordWrap(True)
@@ -76,20 +70,73 @@ class DictDialog(QDialog):
         self.resize(QSize(300, 150))
 
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.save.clicked.connect(self.save_preferences)
         self.load_btn.clicked.connect(self.show_open_file_dialog)
+        self.delete_btn.clicked.connect(self.delete_dictionary)
         self.decline.clicked.connect(self.close)
 
+    def set_dictionaries_lists(self):
+        """
+        Gets and sets to comboboxes lists of dictionaries
+        :return:
+        """
+        db_tables = self.db.get_tables()
+        self.ru_en_dict_combo.clear()
+        self.en_ru_dict_combo.clear()
+        self.delete_combo.clear()
+        self.delete_combo.addItem("Не выбран")
+        if db_tables is not False:
+            for table in db_tables:
+                table = str(table[0])
+                lang = table.split("_")[0]
+                if lang == "ru":
+                    self.ru_en_dict_combo.addItem(table)
+                elif lang == "en":
+                    self.en_ru_dict_combo.addItem(table)
+                self.delete_combo.addItem(table)
+        if db_tables is not False:
+            self.en_ru_dict_combo.setCurrentText(self.settings.get_option("dictionary/en"))
+            self.ru_en_dict_combo.setCurrentText(self.settings.get_option("dictionary/ru"))
+
     def show_open_file_dialog(self):
+        """
+        Opens and parses file
+        :return null:
+        """
         file = QFileDialog.getOpenFileName(self, 'Откройте файл со словарем', '/', "Файлы XML-словаря (*.xdxf);;Текстовые файлы (*.txt)")[0]
         if file:
             file_name = QFileInfo(file).baseName()
             file_ext = QFileInfo(file).suffix()
             parser = translator.Parser()
-            print(file_ext)
-            if file_ext == "xdxf" or "XDXF":
-                parser.parse_xdxf(file, self.progress)
-            elif file_ext == "TXT" or "txt":
-                parser.parse_txt(file, self.progress)
+            lang = "ru" if self.load_combo.currentIndex() == 0 else "en"
+            if file_ext == "xdxf" or file_ext == "XDXF":
+                parser.parse_xdxf(file, lang , file_name, self.progress)
+            elif file_ext == "TXT" or file_ext == "txt":
+                parser.parse_txt(file, lang, file_name, self.progress)
+            QMessageBox.question(self, 'Успех', "Словарь добавлен!", QMessageBox.Ok)
+            self.progress.setValue(0)
+            self.set_dictionaries_lists()
+
+    def delete_dictionary(self):
+        """
+        A wrapper for DB.delete_table()
+        :return:
+        """
+        table = self.delete_combo.currentText()
+        self.db.delete_table(table)
+        if table == self.settings.get_dictionary():
+            self.settings.set_default_options()
+        QMessageBox.question(self, 'Информация', "Словарь удалён!", QMessageBox.Ok)
+        self.set_dictionaries_lists()
+
+    def save_preferences(self):
+        """
+        Saves chosen settings
+        :return:
+        """
+        self.settings.set_option("dictionary/ru", self.ru_en_dict_combo.currentText())
+        self.settings.set_option("dictionary/en", self.en_ru_dict_combo.currentText())
+        self.close()
 
 
 class TrMainWindow(QtWidgets.QMainWindow):
@@ -105,8 +152,14 @@ class TrMainWindow(QtWidgets.QMainWindow):
         self.ui.langTo.currentIndexChanged.connect(self.change_lang)
         self.ui.dictionaries.triggered.connect(self.show_dictionaries_menu)
         self.ui.help_quit.triggered.connect(self.close)
+        self.settings = translator.Settings()
+        self.ui.langFrom.setCurrentIndex(0 if self.settings.get_option("language/from") == "en" else 1)
 
     def translate(self):
+        """
+        Starts translation
+        :return null:
+        """
         tr = translator.Translator()
         in_text = self.ui.input.toPlainText()
         if in_text:
@@ -117,6 +170,11 @@ class TrMainWindow(QtWidgets.QMainWindow):
                 self.ui.output.setPlainText("Перевод не найден.\nПожалуйста, проверьте введённые данные и попробуйте ещё раз.")
 
     def change_lang(self, index):
+        """
+        Changes langFrom and langTo values
+        :param int index: new index
+        :return:
+        """
         sender = self.sender()
         from_combo = self.ui.langFrom
         to_combo = self.ui.langTo
@@ -124,19 +182,29 @@ class TrMainWindow(QtWidgets.QMainWindow):
             to_combo.setCurrentIndex(index)
         if sender == to_combo and from_combo != index:
             from_combo.setCurrentIndex(index)
-        settings = translator.Settings()
         if from_combo.currentIndex() == 0:
-            settings.set_option("language/from", "en")
-            settings.set_option("language/to", "ru")
+            self.settings.set_option("language/from", "en")
+            self.settings.set_option("language/to", "ru")
         else:
-            settings.set_option("language/from", "ru")
-            settings.set_option("language/to", "en")
+            self.settings.set_option("language/from", "ru")
+            self.settings.set_option("language/to", "en")
 
     def show_dictionaries_menu(self):
+        """
+        Opens settings menu
+        :return:
+        """
         dialog = DictDialog(self)
         dialog.show()
 
     def app_excepthook(self, type, value, tback):
+        """
+        Allows to show exceptions in app
+        :param type:
+        :param value:
+        :param tback:
+        :return:
+        """
         QtWidgets.QMessageBox.critical(
             self, "Ошибка", str(value),
             QtWidgets.QMessageBox.Ok
