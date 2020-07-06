@@ -12,7 +12,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
-        MainWindow.setObjectName("MainWindow")
+        MainWindow.setObjectName("STranslate")
         MainWindow.setEnabled(True)
         MainWindow.resize(640, 480)
         MainWindow.setMinimumSize(QtCore.QSize(400, 300))

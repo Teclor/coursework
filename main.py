@@ -226,6 +226,8 @@ class TrMainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.Ok
         )
         sys.__excepthook__(type, value, tback)
+        with open("error.log", "w") as lf:
+            lf.write(str(type) + str(value) + str(tback))
 
 
 app = QtWidgets.QApplication([])
