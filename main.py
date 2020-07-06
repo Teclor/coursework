@@ -1,3 +1,5 @@
+import traceback
+
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import QFileInfo, QSize, QCoreApplication
 from PyQt5.QtCore import Qt
@@ -226,8 +228,8 @@ class TrMainWindow(QtWidgets.QMainWindow):
             QtWidgets.QMessageBox.Ok
         )
         sys.__excepthook__(type, value, tback)
-        with open("error.log", "w") as lf:
-            lf.write(str(type) + str(value) + str(tback))
+        with open("error.log", "a") as lf:
+            lf.write(str(type) + str(value) + str(traceback.format_tb(tback)) + "\n")
 
 
 app = QtWidgets.QApplication([])
