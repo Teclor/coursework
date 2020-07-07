@@ -209,7 +209,6 @@ class Translator(DB):
                     raise Exception("Поддержка языка текущего словаря ещё не реализована.")
 
                 translations = re.findall(reg, translation, flags=re.IGNORECASE)
-                print(translations)
                 for tr in translations:
                     tr = tr.strip()
                     if tr:
