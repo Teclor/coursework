@@ -196,8 +196,10 @@ class Translator(DB):
         lang = self.settings.get_lang()
         match = re.findall(r"\b(?:\w+-?)\b", text, flags=re.DOTALL)
         for m in match:
-            tr = str(self.search_translation(m)[0][0])
-            if tr:
+            translation = self.search_translation(m)
+            if (translation):
+                translation = str(translation[0][0])
+            if translation:
                 if lang == "ru":
                     reg = r"\b(?:[A-Za-z']+-?\.?\s?)+\b"
                 elif lang == "en":
@@ -205,9 +207,15 @@ class Translator(DB):
                 else:
                     raise Exception("Поддержка языка текущего словаря ещё не реализована.")
 
-                tr = re.search(reg, tr, flags=re.IGNORECASE)
-                if tr[0]:
-                    text = re.sub(m, tr[0].strip(), text)
+                translations = re.findall(reg, translation, flags=re.IGNORECASE)
+                for tr in translations:
+                    tr = tr.strip()
+                    if tr:
+                        if len(tr) == 1 and (tr != "I" or (m != "Я" and m != "я")):
+                            continue
+                        else:
+                            text = re.sub(r"\b" + m + r"\b", tr, text)
+                            break
         return text
 
 
