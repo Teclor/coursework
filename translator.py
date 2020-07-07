@@ -166,6 +166,7 @@ class Translator(DB):
         :param string text: input text
         :return string: translation
         """
+        text = text.strip()
         check = re.findall(r"\b(?:\w+-?)\b", text, flags=re.DOTALL)
         cnt = len(check)
         if cnt > 1:
@@ -203,19 +204,24 @@ class Translator(DB):
                 if lang == "ru":
                     reg = r"\b(?:[A-Za-z']+-?\.?\s?)+\b"
                 elif lang == "en":
-                    reg = r"\b(?:[А-Яа-я']+-?\.?\s?)+\b"
+                    reg = r"\b[А-Яа-я']+-?\.?\s?\b"
                 else:
                     raise Exception("Поддержка языка текущего словаря ещё не реализована.")
 
                 translations = re.findall(reg, translation, flags=re.IGNORECASE)
+                print(translations)
                 for tr in translations:
                     tr = tr.strip()
                     if tr:
-                        if len(tr) == 1 and (tr != "I" or (m != "Я" and m != "я")):
-                            continue
-                        else:
-                            text = re.sub(r"\b" + m + r"\b", tr, text)
-                            break
+                        if lang == "ru":
+                            if len(tr) == 1 and (tr != "I" or (m != "Я" and m != "я")):
+                                continue
+                        elif lang == "en":
+                            if (len(tr) == 1 and tr != "я") or tr == "прил." or tr == "прил" or tr == "сущ." \
+                                    or tr == "сущ" or tr == "гл." or tr == "гл" or tr == "нареч." or tr == "нареч" or tr == "сравн." or tr == "сравн" or tr == "мест" or tr == "мест.":
+                                continue
+                        text = re.sub(r"\b" + m + r"\b", tr, text)
+                        break
         return text
 
 
