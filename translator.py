@@ -7,6 +7,76 @@ import re
 from PyQt5.QtCore import QCoreApplication, QSettings
 
 
+class Settings:
+
+    def __new__(cls):
+        """
+        Checks the existence of class instance
+        :return: instance of Settings
+        """
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(Settings, cls).__new__(cls)
+        return cls.instance
+
+    def __init__(self):
+        """
+        Class that is a wrapper on QSettings
+        Used for more simple settings manipulating
+        Singleton
+        """
+        self.version = "1.0.0"
+        self.organization = "AB"
+        self.application = "STranslate"
+        QCoreApplication.setApplicationVersion(self.version)
+        QCoreApplication.setOrganizationName(self.organization)
+        QCoreApplication.setApplicationName(self.application)
+        self.settings = QSettings("config.ini", QSettings.IniFormat)
+        if not QCoreApplication.organizationName() or not QCoreApplication.applicationName():
+            self.set_default_options()
+
+    def set_default_options(self):
+        """
+        Sets default settings
+        """
+        self.settings.setValue('db_name', 'dictionary')
+        self.settings.setValue('dictionary/ru', 'ru_eng')
+        self.settings.setValue('dictionary/en', 'en_rus')
+        self.settings.setValue('language/from', 'ru')
+        self.settings.setValue('language/to', 'en')
+        self.settings.sync()
+
+    def set_option(self, option, value):
+        """
+        Sets a particular setting
+        :param string option: name of the option to set
+        :param string value: value of the option
+        """
+        self.settings.setValue(option, value)
+        self.settings.sync()
+
+    def get_option(self, option):
+        """
+        Gets a particular setting
+        :param string option: a setting we want to get
+        :return string: value of setting
+        """
+        return self.settings.value(option)
+
+    def get_dictionary(self):
+        """
+        Gets current dictionary
+        :return string:
+        """
+        return self.get_option("dictionary/" + self.get_option("language/from"))
+
+    def get_lang(self):
+        """
+        Gets current lang id (ru or en)
+        :return string: lang id
+        """
+        return self.get_option("language/from")
+
+
 class DB:
 
     def __init__(self):
@@ -222,73 +292,3 @@ class Translator(DB):
                         text = re.sub(r"\b" + m + r"\b", tr, text)
                         break
         return text
-
-
-class Settings:
-
-    def __new__(cls):
-        """
-        Checks the existence of class instance
-        :return: instance of Settings
-        """
-        if not hasattr(cls, 'instance'):
-            cls.instance = super(Settings, cls).__new__(cls)
-        return cls.instance
-
-    def __init__(self):
-        """
-        Class that is a wrapper on QSettings
-        Used for more simple settings manipulating
-        Singleton
-        """
-        self.version = "1.0.0"
-        self.organization = "AB"
-        self.application = "STranslate"
-        QCoreApplication.setApplicationVersion(self.version)
-        QCoreApplication.setOrganizationName(self.organization)
-        QCoreApplication.setApplicationName(self.application)
-        self.settings = QSettings("config.ini", QSettings.IniFormat)
-        if not QCoreApplication.organizationName() or not QCoreApplication.applicationName():
-            self.set_default_options()
-
-    def set_default_options(self):
-        """
-        Sets default settings
-        """
-        self.settings.setValue('db_name', 'dictionary')
-        self.settings.setValue('dictionary/ru', 'ru_eng')
-        self.settings.setValue('dictionary/en', 'en_rus')
-        self.settings.setValue('language/from', 'ru')
-        self.settings.setValue('language/to', 'en')
-        self.settings.sync()
-
-    def set_option(self, option, value):
-        """
-        Sets a particular setting
-        :param string option: name of the option to set
-        :param string value: value of the option
-        """
-        self.settings.setValue(option, value)
-        self.settings.sync()
-
-    def get_option(self, option):
-        """
-        Gets a particular setting
-        :param string option: a setting we want to get
-        :return string: value of setting
-        """
-        return self.settings.value(option)
-
-    def get_dictionary(self):
-        """
-        Gets current dictionary
-        :return string:
-        """
-        return self.get_option("dictionary/" + self.get_option("language/from"))
-
-    def get_lang(self):
-        """
-        Gets current lang id (ru or en)
-        :return string: lang id
-        """
-        return self.get_option("language/from")

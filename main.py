@@ -1,9 +1,8 @@
 import traceback
 
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import QFileInfo, QSize, QCoreApplication
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QFileDialog, QDialog, QComboBox, QGridLayout, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QProgressBar, QMessageBox
+from PyQt5.QtCore import QFileInfo, QSize, QCoreApplication, Qt
+from PyQt5.QtWidgets import QFileDialog, QDialog, QComboBox, QGridLayout, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, \
+    QProgressBar, QMessageBox, QMainWindow, QApplication
 
 from interface import Ui_MainWindow
 import sys
@@ -18,8 +17,8 @@ class DictDialog(QDialog):
         """
         super(DictDialog, self).__init__(parent)
         self.setModal(True)
-        self.setWindowTitle('Выбор словаря')
-        self.db = translator.DB()
+        self.setWindowTitle('Управление словарями')
+        self.parser = translator.Parser()
         self.settings = translator.Settings()
         self.main_layout = QVBoxLayout()
         self.choose_layout = QGridLayout()
@@ -33,16 +32,16 @@ class DictDialog(QDialog):
         self.en_label = QLabel(self)
         self.load_label = QLabel(self)
         self.delete_label = QLabel(self)
-        self.load_btn = QtWidgets.QPushButton("Добавить словарь")
+        self.load_btn = QPushButton("Добавить словарь")
         self.progress = QProgressBar(self)
         self.save = QPushButton("Сохранить")
         self.decline = QPushButton("Отмена")
         self.delete_btn = QPushButton("Удалить")
         self.delete_combo.addItem("Не выбран")
         self.load_combo.addItems(["Русско-английский", "Англо-русский"])
-        self.load_layout.addWidget(self.load_btn)
-        self.load_layout.addWidget(self.progress)
         self.load_layout.addWidget(self.load_combo)
+        self.load_layout.addWidget(self.progress)
+        self.load_layout.addWidget(self.load_btn)
         self.delete_layout.addWidget(self.delete_combo)
         self.delete_label.setText("Выберите словарь для удаления")
         self.load_label.setText("Выберите словарь для загрузки.")
@@ -82,7 +81,7 @@ class DictDialog(QDialog):
         Gets and sets to comboboxes lists of dictionaries
         :return:
         """
-        db_tables = self.db.get_tables()
+        db_tables = self.parser.get_tables()
         self.ru_en_dict_combo.clear()
         self.en_ru_dict_combo.clear()
         self.delete_combo.clear()
@@ -109,12 +108,11 @@ class DictDialog(QDialog):
         if file:
             file_name = QFileInfo(file).baseName()
             file_ext = QFileInfo(file).suffix()
-            parser = translator.Parser()
             lang = "ru" if self.load_combo.currentIndex() == 0 else "en"
             if file_ext == "xdxf" or file_ext == "XDXF":
-                parser.parse_xdxf(file, lang , file_name, self.progress)
-            elif file_ext == "TXT" or file_ext == "txt":
-                parser.parse_txt(file, lang, file_name, self.progress)
+                self.parser.parse_xdxf(file, lang, file_name, self.progress)
+            elif file_ext == "txt" or file_ext == "TXT":
+                self.parser.parse_txt(file, lang, file_name, self.progress)
             QMessageBox.question(self, 'Успех', "Словарь добавлен!", QMessageBox.Ok)
             self.progress.setValue(0)
             self.set_dictionaries_lists()
@@ -125,7 +123,7 @@ class DictDialog(QDialog):
         :return:
         """
         table = self.delete_combo.currentText()
-        self.db.delete_table(table)
+        self.parser.delete_table(table)
         if table == self.settings.get_dictionary():
             self.settings.set_default_options()
         QMessageBox.question(self, 'Информация', "Словарь удалён!", QMessageBox.Ok)
@@ -141,7 +139,7 @@ class DictDialog(QDialog):
         self.close()
 
 
-class TrMainWindow(QtWidgets.QMainWindow):
+class TrMainWindow(QMainWindow):
     def __init__(self):
         super(TrMainWindow, self).__init__()
         self.ui = Ui_MainWindow()
@@ -223,16 +221,16 @@ class TrMainWindow(QtWidgets.QMainWindow):
         :param tback:
         :return:
         """
-        QtWidgets.QMessageBox.critical(
+        QMessageBox.critical(
             self, "Ошибка", str(value),
-            QtWidgets.QMessageBox.Ok
+            QMessageBox.Ok
         )
         sys.__excepthook__(type, value, tback)
         with open("error.log", "a") as lf:
             lf.write(str(type) + str(value) + str(traceback.format_tb(tback)) + "\n")
 
 
-app = QtWidgets.QApplication([])
+app = QApplication([])
 application = TrMainWindow()
 sys.excepthook = application.app_excepthook
 application.show()
